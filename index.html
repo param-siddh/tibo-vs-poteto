@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#04070d" />
+  <title>TIBO vs POTETO — ASCII Sword Duel</title>
+  <link rel="manifest" href="./manifest.json" />
+  <style>
+    :root {
+      --bg: #04070d;
+      --panel: #0b111d;
+      --border: #1d2a40;
+      --text: #e2ecf8;
+      --muted: #7a8ea8;
+      --cyan: #33f6ff;
+      --pink: #ff4d8d;
+      --gold: #ffd166;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, ui-monospace, monospace;
+    }
+
+    .stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #04070d;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .top-hud {
+      position: absolute;
+      top: 16px;
+      left: 24px;
+      right: 24px;
+      z-index: 5;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      gap: 12px;
+    }
+
+    .score-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .tibo-col { color: var(--cyan); }
+    .poteto-col { color: var(--pink); }
+
+    .score-num {
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: rgba(18, 28, 46, 0.65);
+      border: 1px solid rgba(29, 42, 64, 0.8);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .hp-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .hp-track {
+      width: 150px;
+      max-width: 28vw;
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(13, 21, 36, 0.7);
+      border: 1px solid rgba(29, 42, 64, 0.8);
+      overflow: hidden;
+    }
+
+    .hp-fill {
+      height: 100%;
+      transition: width 0.14s ease-out;
+    }
+
+    .hp-left { background: var(--cyan); }
+    .hp-right { background: var(--pink); margin-left: auto; }
+
+    .oled-scanlines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.025) 0px,
+          rgba(255, 255, 255, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        ),
+        radial-gradient(circle at center, transparent 58%, rgba(0, 0, 0, 0.55) 100%);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: rgba(4, 7, 13, 0.84);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .overlay.hidden { display: none; }
+
+    .overlay h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+    }
+
+    .overlay p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      max-width: 440px;
+    }
+
+    .pick-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 9px 18px;
+      border-radius: 9px;
+      border: 1px solid rgba(29, 42, 64, 0.9);
+      background: rgba(12, 19, 32, 0.72);
+      backdrop-filter: blur(6px);
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.14s, background 0.14s, transform 0.08s;
+    }
+
+    button:hover { border-color: var(--cyan); background: rgba(24, 37, 61, 0.85); }
+    button:active { transform: scale(0.95); }
+
+    .btn-cyan { border-color: rgba(51, 246, 255, 0.75); color: var(--cyan); background: rgba(51, 246, 255, 0.08); }
+    .btn-pink { border-color: rgba(255, 77, 141, 0.75); color: var(--pink); background: rgba(255, 77, 141, 0.08); }
+    .btn-gold { border-color: rgba(255, 209, 102, 0.65); color: var(--gold); background: rgba(255, 209, 102, 0.07); }
+
+    .video-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      background: #000;
+      padding: 0;
+      margin: 0;
+    }
+    .video-overlay.hidden { display: none; }
+    .video-overlay video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <section id="stage" class="stage" tabindex="0">
+    <canvas id="duelCanvas"></canvas>
+    <div class="oled-scanlines"></div>
+
+    <div class="top-hud">
+      <header class="scoreboard">
+        <div class="score-pill">
+          <span class="tibo-col">TIBO WINS</span>
+          <span id="tiboScore" class="score-num tibo-col">0</span>
+        </div>
+        <div class="score-pill">
+          <span id="potetoScore" class="score-num poteto-col">0</span>
+          <span class="poteto-col">POTETO WINS</span>
+        </div>
+      </header>
+
+      <div class="hud">
+        <div class="hp-group">
+          <strong id="leftTag" class="tibo-col">TIBO</strong>
+          <div class="hp-track"><div id="hpLeft" class="hp-fill hp-left" style="width: 100%"></div></div>
+        </div>
+        <div class="hp-group">
+          <div class="hp-track"><div id="hpRight" class="hp-fill hp-right" style="width: 100%"></div></div>
+          <strong id="rightTag" class="poteto-col">POTETO</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="btn-group">
+        <button id="btnSlash" class="btn-cyan">⚔ Slash</button>
+        <button id="btnParry" class="btn-gold">🛡 Parry</button>
+        <button id="btnDash">» Dash</button>
+      </div>
+    </div>
+
+    <div id="pickOverlay" class="overlay">
+      <h1>CHOOSE YOUR FIGHTER</h1>
+      <p>Dominant hits &amp; parries push your opponent backward. Time your Parry or Dash to defeat the bot!</p>
+      <div class="pick-row">
+        <button id="pickTibo" class="btn-cyan">TIBO</button>
+        <button id="pickPoteto" class="btn-pink">POTETO</button>
+      </div>
+    </div>
+
+    <div id="videoOverlay" class="video-overlay hidden">
+      <video id="victoryVideo" src="./victory.mp4" playsinline preload="auto"></video>
+    </div>
+  </section>
+
+  <script>
+    const RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+
+    const canvas = document.getElementById('duelCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = document.getElementById('stage');
+    const pickOverlay = document.getElementById('pickOverlay');
+    const videoOverlay = document.getElementById('videoOverlay');
+    const victoryVideo = document.getElementById('victoryVideo');
+    const hpLeftEl = document.getElementById('hpLeft');
+    const hpRightEl = document.getElementById('hpRight');
+    const leftTag = document.getElementById('leftTag');
+    const rightTag = document.getElementById('rightTag');
+    const statusText = { textContent: '' };
+    const tiboScoreEl = document.getElementById('tiboScore');
+    const potetoScoreEl = document.getElementById('potetoScore');
+
+    const pickTibo = document.getElementById('pickTibo');
+    const pickPoteto = document.getElementById('pickPoteto');
+    const btnSlash = document.getElementById('btnSlash');
+    const btnParry = document.getElementById('btnParry');
+    const btnDash = document.getElementById('btnDash');
+
+    let tiboWins = Number(localStorage.getItem('tibo_wins') || 0);
+    let potetoWins = Number(localStorage.getItem('poteto_wins') || 0);
+
+    function updateScoreUI() {
+      tiboScoreEl.textContent = String(tiboWins);
+      potetoScoreEl.textContent = String(potetoWins);
+      try {
+        localStorage.setItem('tibo_wins', String(tiboWins));
+        localStorage.setItem('poteto_wins', String(potetoWins));
+      } catch {}
+    }
+    updateScoreUI();
+
+    let COLS = 240;
+    let ROWS = 96;
+    let dpr = Math.min(2, window.devicePixelRatio || 1);
+
+    function resizeCanvas() {
+      const w = Math.max(320, stage.clientWidth || 720);
+      const h = Math.max(240, stage.clientHeight || 360);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ROWS = Math.max(72, Math.round(h / 3.5));
+      COLS = Math.max(145, Math.round(w / 2.25));
+    }
+    resizeCanvas();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resizeCanvas).observe(stage);
+    else window.addEventListener('resize', resizeCanvas);
+
+    // --- Synth SFX ---
+    let sfxEnabled = true;
+    let audioCtx = null;
+
+    function ensureAudio() {
+      if (!sfxEnabled) return null;
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) audioCtx = new AC();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      return audioCtx;
+    }
+
+    function playSwordSfx(type) {
+      const ac = ensureAudio();
+      if (!ac || ac.state !== 'running') return;
+      const now = ac.currentTime;
+
+      if (type === 'clang') {
+        [1420, 2180, 3150].forEach((freq, i) => {
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.type = i === 0 ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.88, now + 0.18);
+          gain.gain.setValueAtTime(0.045 / (i + 1), now);
+          gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.22);
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.start(now);
+          osc.stop(now + 0.23);
+        });
+      } else if (type === 'whoosh') {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(480, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.11);
+        gain.gain.setValueAtTime(0.035, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.start(now);
+        osc.stop(now + 0.13);
+      } else if (type === 'hit') {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(65, now + 0.14);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      } else if (type === 'ko') {
+        [523, 659, 784, 1046].forEach((f, i) => {
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(f, now + i * 0.08);
+          gain.gain.setValueAtTime(0.045, now + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.22);
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.23);
+        });
+      }
+    }
+
+    // User is ALWAYS on the left (-1), bot is ALWAYS on the right (+1)
+    let playerSide = null; // -1 once chosen
+    let userChar = 'TIBO'; // 'TIBO' or 'POTETO'
+
+    function makeFighter(side, charName) {
+      const isLeft = side === -1;
+      const isTibo = charName === 'TIBO';
+      return {
+        side,
+        name: charName,
+        hitWord: isTibo ? 'reset' : 'ship',
+        x: isLeft ? 0.36 : 0.64,
+        y: 0.56,
+        vx: 0,
+        vy: 0,
+        hp: 100,
+        facing: isLeft ? 1 : -1,
+        swordAngle: -0.55,
+        targetSwordAngle: -0.55,
+        slashTrail: [],
+        mood: 'focus',
+        moodTimer: 0,
+        squashX: 1,
+        squashY: 1,
+        vSquashX: 0,
+        vSquashY: 0,
+        attackCooldown: 0.4,
+        dashCooldown: 0,
+        parryTimer: 0,
+        parryCooldown: 0,
+        staggerTimer: 0,
+        swinging: false,
+        swingTimer: 0,
+        hitDealt: false,
+        aiReacted: false,
+        spamCount: 0,
+        aiState: 'pressure',
+        aiTimer: 0.4,
+        color: isTibo ? '#33f6ff' : '#ff4d8d',
+        rimSpec: isTibo ? '#6cd4ff' : '#ff85b3',
+        rimMid: isTibo ? '#1d4d6e' : '#6e1d3f',
+        glowRgba: isTibo ? 'rgba(51, 246, 255, 0.22)' : 'rgba(255, 77, 141, 0.22)',
+        bladeColor: isTibo ? '#aafbff' : '#ffb8d2'
+      };
+    }
+
+    let leftBot = makeFighter(-1, 'TIBO');
+    let rightBot = makeFighter(1, 'POTETO');
+    let duelCenter = 0.50;
+    let sparks = [];
+    let floatingWords = [];
+    let hitStop = 0;
+    let shakeAmt = 0;
+    let koTimer = 0;
+    let winnerName = null;
+    let videoPlaying = false;
+    let videoTriggered = false;
+
+    function playPostFightVideo() {
+      videoTriggered = true;
+      videoPlaying = true;
+      holdState.slash = false;
+      holdState.parry = false;
+      holdState.dash = false;
+      videoOverlay.classList.remove('hidden');
+      victoryVideo.muted = false;
+      victoryVideo.volume = 1.0;
+      victoryVideo.currentTime = 0;
+      victoryVideo.play().catch(() => {});
+    }
+
+    function closePostFightVideo() {
+      victoryVideo.pause();
+      videoOverlay.classList.add('hidden');
+      videoPlaying = false;
+      videoTriggered = false;
+      resetDuel();
+      stage.focus();
+    }
+
+    victoryVideo.addEventListener('ended', closePostFightVideo);
+    videoOverlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    const holdState = { slash: false, parry: false, dash: false };
+
+    function getPlayerBot() {
+      return playerSide === -1 ? leftBot : null;
+    }
+
+    function addSquash(bot, dx, dy) {
+      bot.vSquashX += dx;
+      bot.vSquashY += dy;
+    }
+
+    function spawnSparks(nx, ny, count, col1, col2) {
+      const chars = ['*', '+', 'x', '✦', '.', '#'];
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const spd = 0.25 + Math.random() * 0.9;
+        sparks.push({
+          x: nx,
+          y: ny,
+          vx: Math.cos(a) * spd,
+          vy: Math.sin(a) * spd - 0.15,
+          life: 0.25 + Math.random() * 0.35,
+          maxLife: 0.6,
+          ch: chars[Math.floor(Math.random() * chars.length)],
+          col: i % 2 === 0 ? col1 : col2
+        });
+      }
+    }
+
+    function spawnHitWord(nx, ny, text, col) {
+      floatingWords.push({
+        x: nx,
+        y: ny - 0.14,
+        text,
+        col,
+        life: 0.95,
+        maxLife: 0.95
+      });
+    }
+
+    function updateTagsAndHp() {
+      hpLeftEl.style.width = `${Math.max(0, leftBot.hp)}%`;
+      hpRightEl.style.width = `${Math.max(0, rightBot.hp)}%`;
+      leftTag.textContent = leftBot.name;
+      rightTag.textContent = rightBot.name;
+      leftTag.className = leftBot.name === 'TIBO' ? 'tibo-col' : 'poteto-col';
+      rightTag.className = rightBot.name === 'TIBO' ? 'tibo-col' : 'poteto-col';
+      hpLeftEl.style.background = leftBot.color;
+      hpRightEl.style.background = rightBot.color;
+    }
+
+    function resetDuel() {
+      const botChar = userChar === 'TIBO' ? 'POTETO' : 'TIBO';
+      leftBot = makeFighter(-1, userChar);
+      rightBot = makeFighter(1, botChar);
+      duelCenter = 0.50;
+      sparks = [];
+      floatingWords = [];
+      hitStop = 0;
+      shakeAmt = 0;
+      koTimer = 0;
+      winnerName = null;
+      updateTagsAndHp();
+    }
+
+    function chooseChar(charName) {
+      userChar = charName;
+      playerSide = -1; // User is always left, bot is always right!
+      pickOverlay.classList.add('hidden');
+      resetDuel();
+      stage.focus();
+      playSwordSfx('clang');
+    }
+
+    function startAttack(bot, isSpecial = false) {
+      if (winnerName || bot.swinging || bot.staggerTimer > 0 || bot.attackCooldown > 0) return;
+      bot.swinging = true;
+      bot.parryTimer = 0;
+      bot.swingTimer = isSpecial ? 0.28 : 0.22;
+      bot.attackCooldown = isSpecial ? 0.40 : 0.30;
+      bot.hitDealt = false;
+      bot.aiReacted = false;
+      bot.mood = 'attack';
+      bot.moodTimer = 0.36;
+      bot.swordAngle = -1.55;
+      bot.targetSwordAngle = 1.15;
+      bot.vx += bot.facing * (isSpecial ? 0.76 : 0.46);
+      bot.vy -= 0.14;
+      addSquash(bot, 1.35, -1.15);
+      playSwordSfx('whoosh');
+    }
+
+    function startParry(bot) {
+      if (winnerName || bot.swinging || bot.staggerTimer > 0 || bot.parryCooldown > 0) return;
+      const isPlayer = (playerSide !== 0 && bot.side === playerSide);
+      bot.parryTimer = isPlayer ? 0.38 : 0.26;
+      bot.parryCooldown = isPlayer ? 0.45 : 0.75;
+      bot.targetSwordAngle = -0.1;
+      bot.swordAngle = -0.1;
+      addSquash(bot, -0.8, 0.8);
+    }
+
+    function startDash(bot, dir) {
+      if (winnerName || bot.staggerTimer > 0 || bot.dashCooldown > 0) return;
+      const d = dir || bot.facing;
+      bot.vx = d * 1.15;
+      bot.vy = -0.16;
+      bot.dashCooldown = 0.75;
+      addSquash(bot, 1.7, -1.4);
+      playSwordSfx('whoosh');
+    }
+
+    function updateBotAI(me, foe, dt, t) {
+      if (me.staggerTimer > 0) return;
+      const dist = Math.abs(foe.x - me.x);
+      me.aiTimer -= dt;
+
+      if (foe.swinging && !foe.hitDealt && !foe.aiReacted && dist < 0.35 && !me.swinging) {
+        foe.aiReacted = true;
+        const parryChance = Math.min(0.36, 0.20 + foe.spamCount * 0.05);
+        const r = Math.random();
+        if (r < parryChance && me.parryCooldown <= 0) {
+          startParry(me);
+          me.aiState = 'counter';
+          me.aiTimer = 0.30;
+          return;
+        } else if (r < parryChance + 0.13 && me.dashCooldown <= 0) {
+          startDash(me, -me.facing);
+          return;
+        }
+      }
+
+      if (foe.staggerTimer > 0 && dist < 0.35 && me.attackCooldown <= 0) {
+        startAttack(me, false);
+        me.attackCooldown = 0.72;
+        return;
+      }
+
+      if (me.aiTimer <= 0) {
+        const roll = Math.random();
+        if (dist > 0.37) me.aiState = 'rush';
+        else if (roll < 0.52) me.aiState = 'pressure';
+        else if (roll < 0.80) me.aiState = 'bait';
+        else me.aiState = 'dashStrike';
+        me.aiTimer = 0.45 + Math.random() * 0.45;
+      }
+
+      if (!me.swinging && me.parryTimer <= 0) {
+        if (me.aiState === 'rush' || me.aiState === 'pressure') {
+          if (dist < 0.32 && me.attackCooldown <= 0) {
+            startAttack(me, Math.random() < 0.24);
+            me.attackCooldown = 0.65 + Math.random() * 0.32;
+          }
+        } else if (me.aiState === 'dashStrike') {
+          if (dist > 0.26 && me.dashCooldown <= 0) startDash(me, me.facing);
+          if (dist < 0.33 && me.attackCooldown <= 0) {
+            startAttack(me, true);
+            me.attackCooldown = 0.78;
+            me.aiState = 'bait';
+          }
+        }
+        me.targetSwordAngle = -0.55 + Math.sin(t * 5.0 + me.side) * 0.2;
+      }
+    }
+
+    function getSphereR() {
+      return Math.min(ROWS * 0.22, 26);
+    }
+
+    function drawOrbBot(bot, t, cellW, cellH, charAspect, shakeX, shakeY) {
+      const cx = bot.x * COLS + shakeX;
+      const cy = bot.y * ROWS + Math.sin(t * 3.8 + bot.side) * 1.2 + shakeY;
+      const sphereR = getSphereR();
+      const rxCells = sphereR / charAspect;
+
+      const cxPx = cx * cellW;
+      const cyPx = cy * cellH;
+      const rPx = sphereR * cellH;
+
+      const haloCol = bot.parryTimer > 0 ? 'rgba(255, 209, 102, 0.34)' : bot.glowRgba;
+      const grad = ctx.createRadialGradient(cxPx, cyPx, rPx * 0.1, cxPx, cyPx, rPx * 1.28);
+      grad.addColorStop(0, haloCol);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cxPx, cyPx, rPx * 1.28, 0, Math.PI * 2);
+      ctx.fill();
+
+      const shadowY = Math.min(ROWS - 14, Math.floor(0.56 * ROWS + sphereR * 1.42));
+      const sRx = rxCells * 0.72 * bot.squashX;
+      ctx.fillStyle = bot.rimMid;
+      for (let x = Math.floor(cx - sRx); x <= Math.ceil(cx + sRx); x++) {
+        if (x < 0 || x >= COLS) continue;
+        const d = Math.abs(x - cx) / sRx;
+        ctx.fillText(d < 0.5 ? '=' : '-', x * cellW, shadowY * cellH);
+      }
+
+      const yaw = bot.facing * 0.28;
+      const pitch = bot.mood === 'hurt' ? -0.15 : bot.mood === 'ko' || bot.staggerTimer > 0 ? 0.22 : 0.0;
+      const cyaw = Math.cos(-yaw), syaw = Math.sin(-yaw);
+      const cpitch = Math.cos(-pitch), spitch = Math.sin(-pitch);
+
+      const minY = Math.max(0, Math.floor(cy - sphereR * bot.squashY - 2));
+      const maxY = Math.min(ROWS - 1, Math.ceil(cy + sphereR * bot.squashY + 2));
+      const minX = Math.max(0, Math.floor(cx - rxCells * bot.squashX - 2));
+      const maxX = Math.min(COLS - 1, Math.ceil(cx + rxCells * bot.squashX + 2));
+
+      for (let y = minY; y <= maxY; y++) {
+        const ny = ((y - cy) / sphereR) / bot.squashY;
+        const ny2 = ny * ny;
+        for (let x = minX; x <= maxX; x++) {
+          const nx = (((x - cx) * charAspect) / sphereR) / bot.squashX;
+          const r2 = nx * nx + ny2;
+          if (r2 > 1.0) continue;
+
+          const nz = Math.sqrt(1.0 - r2);
+          const rx2 = nx * cyaw + nz * syaw;
+          const rz2 = -nx * syaw + nz * cyaw;
+          const px = rx2;
+          const py = ny * cpitch - rz2 * spitch;
+          const pz = ny * spitch + rz2 * cpitch;
+
+          let eyeHit = false;
+          if (pz > 0.12) {
+            for (const eside of [-1, 1]) {
+              const ex = px - eside * 0.29;
+              const ey = py + 0.02;
+              if (bot.mood === 'win') {
+                const arch = ey + 0.09 - (ex * ex) * 1.9;
+                if (Math.abs(ex) < 0.22 && arch > -0.095 && arch < 0.03) eyeHit = true;
+              } else if (bot.mood === 'ko' || bot.staggerTimer > 0) {
+                const d = Math.hypot(ex, ey);
+                if (d < 0.22 && Math.sin(d * 28 - Math.atan2(ey, ex) * 2 + t * 10 * eside) > 0.1) eyeHit = true;
+              } else if (bot.mood === 'hurt') {
+                const v = Math.abs(ey) - (0.17 - eside * ex) * 0.7;
+                if (Math.abs(ex) < 0.20 && Math.abs(v) < 0.05) eyeHit = true;
+              } else {
+                if (Math.hypot(ex, ey) <= 0.21) {
+                  const cut = (bot.mood === 'attack' ? -0.05 : -0.10) - eside * ex * 0.82;
+                  if (ey > cut) eyeHit = true;
+                }
+              }
+            }
+          }
+
+          if (eyeHit) {
+            ctx.fillStyle = bot.mood === 'hurt' ? '#ffffff' : bot.parryTimer > 0 ? '#ffd166' : bot.color;
+            ctx.fillText('@', x * cellW, y * cellH);
+            continue;
+          }
+
+          if (r2 < 0.92) continue;
+
+          const diff = Math.max(0, nx * -0.4 + ny * -0.5 + nz * 0.75);
+          const idx = Math.floor(Math.max(0.3, Math.min(0.96, 0.45 + diff * 0.45)) * (RAMP.length - 1));
+          ctx.fillStyle = bot.parryTimer > 0 ? '#ffd166' : diff > 0.35 ? bot.rimSpec : bot.rimMid;
+          ctx.fillText(RAMP[idx], x * cellW, y * cellH);
+        }
+      }
+
+      if (bot.mood !== 'ko') {
+        const hiltX = cx + bot.facing * (rxCells * 1.05);
+        const hiltY = cy + sphereR * 0.15;
+        const bladeLen = sphereR * 1.68;
+
+        for (let k = 0; k < bot.slashTrail.length; k++) {
+          const tr = bot.slashTrail[k];
+          ctx.globalAlpha = (k + 1) / (bot.slashTrail.length + 1) * 0.45;
+          ctx.fillStyle = bot.color;
+          const a = tr.angle;
+          for (let s = 0.45; s <= 1.0; s += 0.14) {
+            const bx = hiltX + Math.cos(a) * bot.facing * (bladeLen * s / charAspect);
+            const by = hiltY + Math.sin(a) * (bladeLen * s);
+            ctx.fillText('~', bx * cellW, by * cellH);
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText('+', hiltX * cellW, hiltY * cellH);
+        ctx.fillText('=', (hiltX - bot.facing * 1.2) * cellW, hiltY * cellH);
+
+        const a = bot.parryTimer > 0 ? -0.95 : bot.swordAngle;
+        const steps = 20;
+        for (let i = 1; i <= steps; i++) {
+          const frac = i / steps;
+          const bx = hiltX + Math.cos(a) * bot.facing * (bladeLen * frac / charAspect);
+          const by = hiltY + Math.sin(a) * (bladeLen * frac);
+          ctx.fillStyle = bot.parryTimer > 0 ? '#ffd166' : frac > 0.7 ? '#ffffff' : bot.bladeColor;
+          const ch = frac > 0.92 ? '*' : Math.abs(Math.sin(a)) > 0.7 ? '|' : Math.sin(a) * bot.facing > 0.25 ? '\\' : Math.sin(a) * bot.facing < -0.25 ? '/' : '=';
+          ctx.fillText(ch, bx * cellW, by * cellH);
+        }
+      }
+    }
+
+    let lastTs = performance.now();
+    let elapsed = 0;
+
+    function tick(now) {
+      const dt = Math.min(0.05, (now - lastTs) / 1000);
+      lastTs = now;
+      elapsed += dt;
+
+      if (hitStop > 0) {
+        hitStop = Math.max(0, hitStop - dt);
+      } else if (playerSide !== null) {
+        shakeAmt = Math.max(0, shakeAmt - dt * 18);
+
+        if (winnerName) {
+          if (!videoTriggered) {
+            playPostFightVideo();
+          }
+        } else {
+          const cellAspectNow = (canvas.width / COLS) / (canvas.height / ROWS);
+          const rxNorm = (getSphereR() / cellAspectNow) / COLS;
+          const halfGap = Math.max(0.065, Math.min(0.125, rxNorm * 2.05));
+          const targetLeftX = Math.max(0.14, duelCenter - halfGap);
+          const targetRightX = Math.min(0.86, duelCenter + halfGap);
+          if (!leftBot.swinging && leftBot.staggerTimer <= 0) {
+            leftBot.vx += (targetLeftX - leftBot.x) * 9.5 * dt;
+          }
+          if (!rightBot.swinging && rightBot.staggerTimer <= 0) {
+            rightBot.vx += (targetRightX - rightBot.x) * 9.5 * dt;
+          }
+
+          if (playerSide !== -1) updateBotAI(leftBot, rightBot, dt, elapsed);
+          if (playerSide !== 1) updateBotAI(rightBot, leftBot, dt, elapsed);
+
+          // Hold-to-repeat / hold-to-guard player controls
+          if (playerSide === -1) {
+            if (holdState.parry) playerParry();
+            else if (holdState.slash) playerSlash();
+            if (holdState.dash) playerDash();
+          }
+
+          const dist = Math.abs(rightBot.x - leftBot.x);
+          for (const [me, foe] of [[leftBot, rightBot], [rightBot, leftBot]]) {
+            me.attackCooldown = Math.max(0, me.attackCooldown - dt);
+            me.dashCooldown = Math.max(0, me.dashCooldown - dt);
+            me.parryTimer = Math.max(0, me.parryTimer - dt);
+            me.parryCooldown = Math.max(0, me.parryCooldown - dt);
+            me.staggerTimer = Math.max(0, me.staggerTimer - dt);
+            me.spamCount = Math.max(0, me.spamCount - dt * 0.8);
+
+            if (me.moodTimer > 0) {
+              me.moodTimer -= dt;
+              if (me.moodTimer <= 0 && !winnerName) me.mood = 'focus';
+            }
+
+            if (me.swinging) {
+              me.swingTimer -= dt;
+              me.slashTrail.push({ angle: me.swordAngle });
+              if (me.slashTrail.length > 6) me.slashTrail.shift();
+
+              if (!me.hitDealt && me.swingTimer < 0.12) {
+                me.hitDealt = true;
+                if (dist < 0.34) {
+                  if (foe.parryTimer > 0) {
+                    const midX = (leftBot.x + rightBot.x) * 0.5;
+                    spawnSparks(midX, 0.52, 26, '#ffd166', '#ffffff');
+                    me.vx = -me.facing * 0.65;
+                    me.staggerTimer = (playerSide !== 0 && me.side !== playerSide) ? 0.90 : 0.55;
+                    duelCenter = Math.max(0.26, Math.min(0.74, duelCenter + foe.facing * 0.055));
+                    foe.attackCooldown = 0;
+                    addSquash(me, -1.5, 1.5);
+                    addSquash(foe, 1.3, -1.1);
+                    hitStop = 0.08;
+                    shakeAmt = 2.8;
+                    statusText.textContent = `🛡 ${foe.name} PARRIED!`;
+                    playSwordSfx('clang');
+                  } else if (foe.swinging) {
+                    const midX = (leftBot.x + rightBot.x) * 0.5;
+                    spawnSparks(midX, 0.52, 22, '#ffffff', '#ffd166');
+                    leftBot.vx = -0.55;
+                    rightBot.vx = 0.55;
+                    hitStop = 0.065;
+                    shakeAmt = 2.4;
+                    statusText.textContent = '⚡ CLANG!!';
+                    playSwordSfx('clang');
+                  } else {
+                    const isBotAttacker = (playerSide !== 0 && me.side !== playerSide);
+                    const dmg = isBotAttacker ? 13 : 17;
+                    foe.hp = Math.max(0, foe.hp - dmg);
+                    foe.vx = me.facing * 0.72;
+                    foe.vy = -0.22;
+                    duelCenter = Math.max(0.26, Math.min(0.74, duelCenter + me.facing * 0.075));
+                    foe.mood = 'hurt';
+                    foe.moodTimer = 0.42;
+                    addSquash(foe, -1.8, 2.0);
+                    spawnSparks(foe.x - me.facing * 0.06, foe.y, 18, me.color, '#ffffff');
+                    spawnHitWord(foe.x, foe.y, me.hitWord, me.color);
+                    hitStop = 0.055;
+                    shakeAmt = 2.2;
+                    updateTagsAndHp();
+                    statusText.textContent = `${me.name} → ${me.hitWord}!`;
+                    playSwordSfx('hit');
+
+                    if (foe.hp <= 0) {
+                      winnerName = me.name;
+                      if (me.name === 'TIBO') tiboWins++;
+                      else potetoWins++;
+                      updateScoreUI();
+                      me.mood = 'win';
+                      foe.mood = 'ko';
+                      spawnSparks(foe.x, foe.y, 34, me.color, '#ffd166');
+                      playPostFightVideo();
+                    }
+                  }
+                }
+              }
+
+              if (me.swingTimer <= 0) {
+                me.swinging = false;
+                me.slashTrail = [];
+              }
+            }
+          }
+        }
+
+        for (const bot of [leftBot, rightBot]) {
+          bot.x += bot.vx * dt;
+          bot.y += bot.vy * dt;
+          bot.vx *= Math.pow(0.05, dt);
+          bot.vy += (0.56 - bot.y) * 18 * dt;
+          bot.vy *= Math.pow(0.08, dt);
+
+          bot.x = Math.max(0.13, Math.min(0.87, bot.x));
+          const minSep = Math.max(0.10, Math.min(0.19, ((getSphereR() / ((canvas.width / COLS) / (canvas.height / ROWS))) / COLS) * 2.5));
+          if (rightBot.x - leftBot.x < minSep) {
+            const mid = (leftBot.x + rightBot.x) * 0.5;
+            leftBot.x = mid - minSep * 0.5;
+            rightBot.x = mid + minSep * 0.5;
+          }
+
+          const swingSpeed = bot.swinging ? 26 : 9;
+          bot.swordAngle += (bot.targetSwordAngle - bot.swordAngle) * Math.min(1, dt * swingSpeed);
+
+          const k = 180, damp = 12;
+          bot.vSquashX += (-k * (bot.squashX - 1) - damp * bot.vSquashX) * dt;
+          bot.vSquashY += (-k * (bot.squashY - 1) - damp * bot.vSquashY) * dt;
+          bot.squashX = Math.max(0.82, Math.min(1.22, bot.squashX + bot.vSquashX * dt));
+          bot.squashY = Math.max(0.82, Math.min(1.22, bot.squashY + bot.vSquashY * dt));
+        }
+
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const sp = sparks[i];
+          sp.x += sp.vx * dt;
+          sp.y += sp.vy * dt;
+          sp.vy += 1.4 * dt;
+          sp.life -= dt;
+          if (sp.life <= 0) sparks.splice(i, 1);
+        }
+
+        for (let i = floatingWords.length - 1; i >= 0; i--) {
+          const fw = floatingWords[i];
+          fw.y -= 0.18 * dt;
+          fw.life -= dt;
+          if (fw.life <= 0) floatingWords.splice(i, 1);
+        }
+      }
+
+      ctx.fillStyle = '#04070d';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cellW = canvas.width / COLS;
+      const cellH = canvas.height / ROWS;
+      const charAspect = cellW / cellH;
+
+      const sX = (Math.random() - 0.5) * shakeAmt;
+      const sY = (Math.random() - 0.5) * shakeAmt;
+
+      ctx.font = `bold ${Math.max(4, Math.floor(cellH * 1.02))}px "Cascadia Code", "Fira Code", Consolas, monospace`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#142233';
+      const floorY = Math.min(ROWS - 13, Math.floor(0.56 * ROWS + getSphereR() * 1.45));
+      for (let x = 6; x < COLS - 6; x += 2) {
+        ctx.fillText('·', x * cellW, floorY * cellH);
+      }
+
+      drawOrbBot(leftBot, elapsed, cellW, cellH, charAspect, sX, sY);
+      drawOrbBot(rightBot, elapsed, cellW, cellH, charAspect, sX, sY);
+
+      ctx.font = `bold ${Math.round(13 * dpr)}px "Cascadia Code", "Fira Code", Consolas, monospace`;
+      for (const sp of sparks) {
+        ctx.globalAlpha = Math.max(0, sp.life / sp.maxLife);
+        ctx.fillStyle = sp.col;
+        ctx.fillText(sp.ch, sp.x * canvas.width, sp.y * canvas.height);
+      }
+
+      ctx.font = `bold ${Math.round(22 * dpr)}px "Cascadia Code", "Fira Code", Consolas, monospace`;
+      ctx.textAlign = 'center';
+      for (const fw of floatingWords) {
+        ctx.globalAlpha = Math.min(1, (fw.life / fw.maxLife) * 1.35);
+        ctx.fillStyle = fw.col;
+        ctx.fillText(fw.text, fw.x * canvas.width, fw.y * canvas.height);
+      }
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+
+      requestAnimationFrame(tick);
+    }
+
+    pickTibo.addEventListener('click', () => chooseChar('TIBO'));
+    pickPoteto.addEventListener('click', () => chooseChar('POTETO'));
+
+    function playerSlash() {
+      const p = getPlayerBot();
+      if (!p) return;
+      p.spamCount += 1;
+      startAttack(p, false);
+    }
+    function playerParry() {
+      const p = getPlayerBot();
+      if (p) startParry(p);
+    }
+    function playerDash() {
+      const p = getPlayerBot();
+      if (!p) return;
+      startDash(p, p.facing);
+      duelCenter = Math.max(0.26, Math.min(0.74, duelCenter + p.facing * 0.035));
+    }
+
+    stage.addEventListener('pointerdown', () => {
+      if (playerSide === -1) {
+        stage.focus();
+        holdState.slash = true;
+        playerSlash();
+      }
+    });
+    const stopStageHold = () => { holdState.slash = false; };
+    stage.addEventListener('pointerup', stopStageHold);
+    stage.addEventListener('pointerleave', stopStageHold);
+    stage.addEventListener('pointercancel', stopStageHold);
+
+    function bindHoldButton(btn, key, action) {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        holdState[key] = true;
+        btn.style.transform = 'scale(0.95)';
+        action();
+      });
+      const release = () => {
+        holdState[key] = false;
+        btn.style.transform = '';
+      };
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointerleave', release);
+      btn.addEventListener('pointercancel', release);
+    }
+
+    bindHoldButton(btnSlash, 'slash', playerSlash);
+    bindHoldButton(btnParry, 'parry', playerParry);
+    bindHoldButton(btnDash, 'dash', playerDash);
+
+    window.addEventListener('keydown', (e) => {
+      if (playerSide !== -1) return;
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyJ') {
+        holdState.slash = true;
+        playerSlash();
+        e.preventDefault();
+      }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') { holdState.parry = true; playerParry(); e.preventDefault(); }
+      if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'KeyL') { holdState.dash = true; playerDash(); e.preventDefault(); }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyJ') holdState.slash = false;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') holdState.parry = false;
+      if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'KeyL') holdState.dash = false;
+    });
+
+    window.addEventListener('blur', () => {
+      holdState.slash = false;
+      holdState.parry = false;
+      holdState.dash = false;
+    });
+
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "TIBO vs POTETO — ASCII Sword Duel",
+  "short_name": "Tibo vs Poteto",
+  "description": "Fast-paced micro-ASCII sword duel between Tibo and Poteto.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#04070d",
+  "theme_color": "#04070d"
+}
