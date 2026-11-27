@@ -4,6 +4,7 @@
   "description": "Fast-paced micro-ASCII sword duel between Tibo and Poteto.",
   "start_url": "./index.html",
   "display": "standalone",
+  "orientation": "landscape",
   "background_color": "#04070d",
   "theme_color": "#04070d"
 }
